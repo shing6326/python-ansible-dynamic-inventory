@@ -7,8 +7,8 @@ import configparser
 import subprocess
 from collections import MutableMapping
 from ansible.parsing.dataloader import DataLoader
-from ansible.vars import VariableManager
-from ansible.inventory import Inventory
+from ansible.vars.manager import VariableManager
+from ansible.inventory.manager import InventoryManager
 
 
 def _merge_hash(a, b):
@@ -52,7 +52,7 @@ class AnsibleDynamicInventory:
         static_inventory = dict()
         static_inventory_path = config.get("ansible", "static_inventory_path")
         if static_inventory_path:
-            static_inventory = Inventory(DataLoader(), VariableManager(), static_inventory_path)
+            static_inventory = InventoryManager(DataLoader(), static_inventory_path)
         return static_inventory
 
     def _load_ansible_dynamic_inventory(self, config):
@@ -64,23 +64,27 @@ class AnsibleDynamicInventory:
         return dynamic_inventory
 
     def _convert_to_dynamic_inventory(aelf, ansible_static_inventory):
+        variable_manager = VariableManager(loader=DataLoader(), inventory=ansible_static_inventory)
         ansible_dynamic_inventory = dict()
-        for v in ansible_static_inventory.get_groups():
-            ansible_dynamic_inventory[v] = dict()
-            group = ansible_static_inventory.get_group(v)
+        for group in ansible_static_inventory.groups.values():
+            ansible_dynamic_inventory[group.name] = dict()
             group_hosts = group.get_hosts()
             if len(group_hosts):
-                ansible_dynamic_inventory[v]["hosts"] = map(str, group_hosts)
+                ansible_dynamic_inventory[group.name]["hosts"] = map(str, group_hosts)
             group_vars = group.get_vars()
             if len(group_vars):
-                ansible_dynamic_inventory[v]["vars"] = group_vars
+                ansible_dynamic_inventory[group.name]["vars"] = group_vars
             group_children = group.child_groups
             if len(group_children):
-                ansible_dynamic_inventory[v]["children"] = map(str, group_children)
+                ansible_dynamic_inventory[group.name]["children"] = map(str, group_children)
         ansible_dynamic_inventory["_meta"] = dict()
         ansible_dynamic_inventory["_meta"]["hostvars"] = dict()
-        for v in ansible_static_inventory.get_hosts():
-            ansible_dynamic_inventory["_meta"]["hostvars"][v.name] = dict(v.vars)
+        for host in ansible_static_inventory.get_hosts():
+            ansible_dynamic_inventory["_meta"]["hostvars"][host.name] = variable_manager.get_vars(host=host)
+            del(ansible_dynamic_inventory['_meta']['hostvars'][host.name]['groups'])
+            del(ansible_dynamic_inventory['_meta']['hostvars'][host.name]['inventory_dir'])
+            del(ansible_dynamic_inventory['_meta']['hostvars'][host.name]['inventory_file'])
+            del(ansible_dynamic_inventory['_meta']['hostvars'][host.name]['omit'])
         return ansible_dynamic_inventory
 
     def _replace_with_consul_service(self, config, ansible_dynamic_inventory):
