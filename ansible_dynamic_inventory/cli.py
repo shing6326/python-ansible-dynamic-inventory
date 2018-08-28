@@ -29,7 +29,7 @@ def main():
         plantuml_text = adi.convert_to_plantuml(ansible_dynamic_inventory)
         print(plantuml_text)
     else:
-        print(json.dumps(ansible_dynamic_inventory, indent=2))
+        print(json.dumps(ansible_dynamic_inventory, indent=2, sort_keys=True))
 
 
 if __name__ == '__main__':

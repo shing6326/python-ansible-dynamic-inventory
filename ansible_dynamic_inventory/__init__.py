@@ -32,6 +32,9 @@ class AnsibleDynamicInventory:
         ansible_static_inventory = self._replace_with_consul_service(config, ansible_static_inventory)
         ansible_dynamic_inventory = self._load_ansible_dynamic_inventory(config)
         self.ansible_dynamic_inventory = _merge_hash(ansible_static_inventory, ansible_dynamic_inventory)
+        del(self.ansible_dynamic_inventory['all'])
+        del(self.ansible_dynamic_inventory['ungrouped'])
+
 
     def get_inventory(self):
         return self.ansible_dynamic_inventory
